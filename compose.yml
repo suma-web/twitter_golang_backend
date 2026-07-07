@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: twitter_postgres
+    environment:
+      POSTGRES_USER: twitter
+      POSTGRES_PASSWORD: twitter_password
+      POSTGRES_DB: twitter
+    ports:
+      - "5432:5432"
+    volumes:
+      - twitter_postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U twitter -d twitter"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: twitter_go_backend
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      DATABASE_URL: "postgres://twitter:twitter_password@postgres:5432/twitter?sslmode=disable"
+      FRONTEND_URL: "http://localhost:5173"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: go run ./cmd/api
+
+volumes:
+  twitter_postgres_data:

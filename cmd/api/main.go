@@ -1,0 +1,77 @@
+package main
+
+import (
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+
+	"twitter_golang_backend/internal/config"
+	"twitter_golang_backend/internal/database"
+	"twitter_golang_backend/internal/user"
+)
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	db, err := database.Open(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	userRepository := user.NewRepository(db)
+	userHandler := user.NewHandler(userRepository)
+
+	router := chi.NewRouter()
+
+	router.Use(middleware.RequestID)
+	router.Use(middleware.RealIP)
+	router.Use(middleware.Logger)
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.Timeout(15 * time.Second))
+
+	router.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{cfg.FrontendURL},
+		AllowedMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodOptions,
+		},
+		AllowedHeaders: []string{
+			"Accept",
+			"Authorization",
+			"Content-Type",
+		},
+		MaxAge: 300,
+	}))
+
+	router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+
+	router.Post("/api/signup", userHandler.Signup)
+
+	server := &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	log.Printf("server started on http://localhost:%s", cfg.Port)
+
+	if err := server.ListenAndServe(); err != nil &&
+		err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
+}
