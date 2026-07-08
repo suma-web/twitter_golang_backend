@@ -58,6 +58,7 @@ func main() {
 	})
 
 	router.Post("/api/signup", userHandler.Signup)
+	router.Post("/api/login", userHandler.Login)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

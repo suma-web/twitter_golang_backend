@@ -9,15 +9,31 @@ type SignupRequest struct {
 	Password string `json:"password"`
 }
 
+type LoginRequest struct {
+	Identifier string `json:"identifier"`
+	Name       string `json:"name"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+}
+
 type User struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	Birthday  time.Time `json:"-"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	Email        string    `json:"email"`
+	Birthday     time.Time `json:"-"`
+	PasswordHash string    `json:"-"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type SignupResponse struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	Birthday  string `json:"birthday"`
+	CreatedAt string `json:"created_at"`
+}
+
+type LoginResponse struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
 	Email     string `json:"email"`
