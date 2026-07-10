@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -122,6 +123,69 @@ func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, response)
 }
 
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	var request LoginRequest
+
+	if err := decoder.Decode(&request); err != nil {
+		writeError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_JSON",
+			"リクエストの形式が正しくありません",
+		)
+		return
+	}
+
+	identifier := normalizeLoginIdentifier(request)
+
+	if message := validateLogin(identifier, request.Password); message != "" {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", message)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	foundUser, err := h.repository.FindByLoginIdentifier(ctx, identifier)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeInvalidCredentials(w)
+			return
+		}
+
+		writeError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"サーバーエラーが発生しました",
+		)
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword(
+		[]byte(foundUser.PasswordHash),
+		[]byte(request.Password),
+	); err != nil {
+		writeInvalidCredentials(w)
+		return
+	}
+
+	response := LoginResponse{
+		ID:        foundUser.ID,
+		Name:      foundUser.Name,
+		Email:     foundUser.Email,
+		Birthday:  foundUser.Birthday.Format("2006-01-02"),
+		CreatedAt: foundUser.CreatedAt.Format(time.RFC3339),
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
 func validateSignup(request SignupRequest, name, email string) string {
 	if name == "" {
 		return "名前を入力してください"
@@ -147,6 +211,30 @@ func validateSignup(request SignupRequest, name, email string) string {
 	return ""
 }
 
+func normalizeLoginIdentifier(request LoginRequest) string {
+	if strings.TrimSpace(request.Identifier) != "" {
+		return strings.TrimSpace(request.Identifier)
+	}
+
+	if strings.TrimSpace(request.Email) != "" {
+		return strings.ToLower(strings.TrimSpace(request.Email))
+	}
+
+	return strings.TrimSpace(request.Name)
+}
+
+func validateLogin(identifier, password string) string {
+	if identifier == "" {
+		return "ユーザー名またはメールアドレスを入力してください"
+	}
+
+	if password == "" {
+		return "パスワードを入力してください"
+	}
+
+	return ""
+}
+
 func isUniqueViolation(err error) bool {
 	var pgError *pgconn.PgError
 
@@ -155,6 +243,15 @@ func isUniqueViolation(err error) bool {
 	}
 
 	return false
+}
+
+func writeInvalidCredentials(w http.ResponseWriter) {
+	writeError(
+		w,
+		http.StatusUnauthorized,
+		"INVALID_CREDENTIALS",
+		"ユーザー名またはパスワードが違います",
+	)
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {
