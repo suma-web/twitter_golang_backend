@@ -84,3 +84,25 @@ func (r *Repository) FindByLoginIdentifier(
 
 	return foundUser, nil
 }
+
+func (r *Repository) FindByID(ctx context.Context, userID int64) (User, error) {
+	const query = `
+		SELECT id, name, email, birthday, created_at
+		FROM users
+		WHERE id = $1
+	`
+
+	var foundUser User
+	err := r.db.QueryRowContext(ctx, query, userID).Scan(
+		&foundUser.ID,
+		&foundUser.Name,
+		&foundUser.Email,
+		&foundUser.Birthday,
+		&foundUser.CreatedAt,
+	)
+	if err != nil {
+		return User{}, fmt.Errorf("find user by id: %w", err)
+	}
+
+	return foundUser, nil
+}

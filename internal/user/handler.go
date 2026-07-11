@@ -12,14 +12,16 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
+	"twitter_golang_backend/internal/auth"
 )
 
 type Handler struct {
-	repository *Repository
+	repository    *Repository
+	sessionSecret string
 }
 
-func NewHandler(repository *Repository) *Handler {
-	return &Handler{repository: repository}
+func NewHandler(repository *Repository, sessionSecret string) *Handler {
+	return &Handler{repository: repository, sessionSecret: sessionSecret}
 }
 
 type errorBody struct {
@@ -175,6 +177,8 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	auth.SetSessionCookie(w, foundUser.ID, h.sessionSecret)
+
 	response := LoginResponse{
 		ID:        foundUser.ID,
 		Name:      foundUser.Name,
@@ -184,6 +188,33 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserID(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	foundUser, err := h.repository.FindByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "USER_NOT_FOUND", "ユーザーが見つかりません")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "ユーザー情報を取得できませんでした")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, CurrentUserResponse{
+		ID:   foundUser.ID,
+		Name: foundUser.Name,
+	})
 }
 
 func validateSignup(request SignupRequest, name, email string) string {

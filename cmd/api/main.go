@@ -9,8 +9,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"twitter_golang_backend/internal/auth"
 	"twitter_golang_backend/internal/config"
 	"twitter_golang_backend/internal/database"
+	"twitter_golang_backend/internal/post"
 	"twitter_golang_backend/internal/user"
 )
 
@@ -27,7 +29,9 @@ func main() {
 	defer db.Close()
 
 	userRepository := user.NewRepository(db)
-	userHandler := user.NewHandler(userRepository)
+	userHandler := user.NewHandler(userRepository, cfg.SessionSecret)
+	postRepository := post.NewRepository(db)
+	postHandler := post.NewHandler(postRepository, "uploads")
 
 	router := chi.NewRouter()
 
@@ -49,7 +53,8 @@ func main() {
 			"Authorization",
 			"Content-Type",
 		},
-		MaxAge: 300,
+		AllowCredentials: true,
+		MaxAge:           300,
 	}))
 
 	router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -59,6 +64,9 @@ func main() {
 
 	router.Post("/api/signup", userHandler.Signup)
 	router.Post("/api/login", userHandler.Login)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/me", userHandler.Me)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts", postHandler.Create)
+	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
