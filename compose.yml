@@ -28,6 +28,7 @@ services:
       PORT: "8080"
       DATABASE_URL: "postgres://twitter:twitter_password@postgres:5432/twitter?sslmode=disable"
       FRONTEND_URL: "http://localhost:5173"
+      SESSION_SECRET: "development-session-secret-change-me"
     depends_on:
       postgres:
         condition: service_healthy

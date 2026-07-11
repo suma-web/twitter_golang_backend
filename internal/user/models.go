@@ -40,3 +40,8 @@ type LoginResponse struct {
 	Birthday  string `json:"birthday"`
 	CreatedAt string `json:"created_at"`
 }
+
+type CurrentUserResponse struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
