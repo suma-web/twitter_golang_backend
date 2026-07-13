@@ -10,3 +10,10 @@ type Post struct {
 	ImageURL  *string   `json:"image_url"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+type ListResponse struct {
+	Posts   []Post `json:"posts"`
+	Limit   int    `json:"limit"`
+	Offset  int    `json:"offset"`
+	HasMore bool   `json:"has_more"`
+}

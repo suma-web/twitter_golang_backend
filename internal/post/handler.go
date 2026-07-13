@@ -1,6 +1,7 @@
 package post
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -11,7 +12,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"twitter_golang_backend/internal/auth"
@@ -72,6 +75,49 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, created)
+}
+
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
+	limit, err := parseNonNegativeQuery(r, "limit", 20)
+	if err != nil || limit < 1 || limit > 100 {
+		writeError(w, http.StatusBadRequest, "INVALID_LIMIT", "limitは1以上100以下の整数で指定してください")
+		return
+	}
+	offset, err := parseNonNegativeQuery(r, "offset", 0)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_OFFSET", "offsetは0以上の整数で指定してください")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	posts, err := h.repository.List(ctx, limit+1, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "投稿一覧を取得できませんでした")
+		return
+	}
+
+	hasMore := len(posts) > limit
+	if hasMore {
+		posts = posts[:limit]
+	}
+
+	writeJSON(w, http.StatusOK, ListResponse{
+		Posts: posts, Limit: limit, Offset: offset, HasMore: hasMore,
+	})
+}
+
+func parseNonNegativeQuery(r *http.Request, key string, fallback int) (int, error) {
+	value := r.URL.Query().Get(key)
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return 0, fmt.Errorf("invalid %s", key)
+	}
+	return parsed, nil
 }
 
 func (h *Handler) saveImage(file multipart.File, header *multipart.FileHeader) (string, error) {

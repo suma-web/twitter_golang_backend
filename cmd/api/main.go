@@ -65,6 +65,7 @@ func main() {
 	router.Post("/api/signup", userHandler.Signup)
 	router.Post("/api/login", userHandler.Login)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/me", userHandler.Me)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts", postHandler.List)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts", postHandler.Create)
 	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 
