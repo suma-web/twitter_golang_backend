@@ -30,3 +30,36 @@ func (r *Repository) Create(ctx context.Context, userID int64, doc string, image
 	}
 	return created, nil
 }
+
+func (r *Repository) List(ctx context.Context, limit, offset int) ([]Post, error) {
+	const query = `
+		SELECT posts.id, posts.user_id, users.name, posts.doc,
+		       posts.image_url, posts.created_at
+		FROM posts
+		JOIN users ON users.id = posts.user_id
+		ORDER BY posts.created_at DESC, posts.id DESC
+		LIMIT $1 OFFSET $2`
+
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("list posts: %w", err)
+	}
+	defer rows.Close()
+
+	posts := make([]Post, 0)
+	for rows.Next() {
+		var item Post
+		if err := rows.Scan(
+			&item.ID, &item.UserID, &item.Name, &item.Doc,
+			&item.ImageURL, &item.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan post: %w", err)
+		}
+		posts = append(posts, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate posts: %w", err)
+	}
+
+	return posts, nil
+}
