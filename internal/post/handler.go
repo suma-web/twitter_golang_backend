@@ -3,6 +3,7 @@ package post
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/go-chi/chi/v5"
 	"twitter_golang_backend/internal/auth"
 )
 
@@ -106,6 +108,29 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, ListResponse{
 		Posts: posts, Limit: limit, Offset: offset, HasMore: hasMore,
 	})
+}
+
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+	postID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || postID <= 0 {
+		writeError(w, http.StatusBadRequest, "INVALID_POST_ID", "投稿IDが不正です")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	found, err := h.repository.FindByID(ctx, postID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "POST_NOT_FOUND", "投稿が見つかりません")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "投稿を取得できませんでした")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, found)
 }
 
 func parseNonNegativeQuery(r *http.Request, key string, fallback int) (int, error) {

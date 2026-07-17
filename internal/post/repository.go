@@ -63,3 +63,23 @@ func (r *Repository) List(ctx context.Context, limit, offset int) ([]Post, error
 
 	return posts, nil
 }
+
+func (r *Repository) FindByID(ctx context.Context, postID int64) (Post, error) {
+	const query = `
+		SELECT posts.id, posts.user_id, users.name, posts.doc,
+		       posts.image_url, posts.created_at
+		FROM posts
+		JOIN users ON users.id = posts.user_id
+		WHERE posts.id = $1`
+
+	var found Post
+	err := r.db.QueryRowContext(ctx, query, postID).Scan(
+		&found.ID, &found.UserID, &found.Name, &found.Doc,
+		&found.ImageURL, &found.CreatedAt,
+	)
+	if err != nil {
+		return Post{}, fmt.Errorf("find post by id: %w", err)
+	}
+
+	return found, nil
+}
