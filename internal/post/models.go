@@ -17,3 +17,12 @@ type ListResponse struct {
 	Offset  int    `json:"offset"`
 	HasMore bool   `json:"has_more"`
 }
+
+// UserTweetsResponse leaves room to add profile-related metadata later while
+// keeping the user's tweets under a stable key.
+type UserTweetsResponse struct {
+	Tweets  []Post `json:"tweets"`
+	Limit   int    `json:"limit"`
+	Offset  int    `json:"offset"`
+	HasMore bool   `json:"has_more"`
+}

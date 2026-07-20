@@ -94,7 +94,13 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	posts, err := h.repository.List(ctx, limit+1, offset)
+	var posts []Post
+	name := strings.TrimSpace(r.URL.Query().Get("user"))
+	if name == "" {
+		posts, err = h.repository.List(ctx, limit+1, offset)
+	} else {
+		posts, err = h.repository.ListByUserName(ctx, name, limit+1, offset)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "投稿一覧を取得できませんでした")
 		return
@@ -103,6 +109,12 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	hasMore := len(posts) > limit
 	if hasMore {
 		posts = posts[:limit]
+	}
+	if name != "" {
+		writeJSON(w, http.StatusOK, UserTweetsResponse{
+			Tweets: posts, Limit: limit, Offset: offset, HasMore: hasMore,
+		})
+		return
 	}
 
 	writeJSON(w, http.StatusOK, ListResponse{

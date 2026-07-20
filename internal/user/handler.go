@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 	"twitter_golang_backend/internal/auth"
@@ -212,8 +213,61 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, CurrentUserResponse{
-		ID:   foundUser.ID,
-		Name: foundUser.Name,
+		ID: foundUser.ID, Name: foundUser.Name, Bio: foundUser.Bio,
+		Location: foundUser.Location, Website: foundUser.Website,
+		CreatedAt: foundUser.CreatedAt.Format(time.RFC3339),
+	})
+}
+
+func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(chi.URLParam(r, "name"))
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	found, err := h.repository.FindByName(ctx, name)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "USER_NOT_FOUND", "ユーザーが見つかりません")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "プロフィールを取得できませんでした")
+		return
+	}
+	writeJSON(w, http.StatusOK, CurrentUserResponse{
+		ID: found.ID, Name: found.Name, Bio: found.Bio, Location: found.Location,
+		Website: found.Website, CreatedAt: found.CreatedAt.Format(time.RFC3339),
+	})
+}
+
+func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserID(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var request UpdateProfileRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&request); err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_JSON", "リクエストの形式が正しくありません")
+		return
+	}
+	name, bio := strings.TrimSpace(request.Name), strings.TrimSpace(request.Bio)
+	location, website := strings.TrimSpace(request.Location), strings.TrimSpace(request.Website)
+	if name == "" || len([]rune(name)) > 50 || len([]rune(bio)) > 160 || len([]rune(location)) > 30 || len([]rune(website)) > 200 {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "入力文字数を確認してください")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	updated, err := h.repository.UpdateProfile(ctx, userID, name, bio, location, website)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "プロフィールを更新できませんでした")
+		return
+	}
+	writeJSON(w, http.StatusOK, CurrentUserResponse{
+		ID: updated.ID, Name: updated.Name, Bio: updated.Bio, Location: updated.Location,
+		Website: updated.Website, CreatedAt: updated.CreatedAt.Format(time.RFC3339),
 	})
 }
 

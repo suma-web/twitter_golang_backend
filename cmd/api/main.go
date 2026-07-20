@@ -46,6 +46,7 @@ func main() {
 		AllowedMethods: []string{
 			http.MethodGet,
 			http.MethodPost,
+			http.MethodPatch,
 			http.MethodOptions,
 		},
 		AllowedHeaders: []string{
@@ -65,6 +66,8 @@ func main() {
 	router.Post("/api/signup", userHandler.Signup)
 	router.Post("/api/login", userHandler.Login)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/me", userHandler.Me)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/me", userHandler.UpdateProfile)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{name}", userHandler.Profile)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts", postHandler.List)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts/{id}", postHandler.Get)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts", postHandler.Create)
