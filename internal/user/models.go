@@ -23,6 +23,9 @@ type User struct {
 	Birthday     time.Time `json:"-"`
 	PasswordHash string    `json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
+	Bio          string    `json:"bio"`
+	Location     string    `json:"location"`
+	Website      string    `json:"website"`
 }
 
 type SignupResponse struct {
@@ -42,6 +45,17 @@ type LoginResponse struct {
 }
 
 type CurrentUserResponse struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Bio       string `json:"bio"`
+	Location  string `json:"location"`
+	Website   string `json:"website"`
+	CreatedAt string `json:"created_at"`
+}
+
+type UpdateProfileRequest struct {
+	Name     string `json:"name"`
+	Bio      string `json:"bio"`
+	Location string `json:"location"`
+	Website  string `json:"website"`
 }

@@ -87,7 +87,7 @@ func (r *Repository) FindByLoginIdentifier(
 
 func (r *Repository) FindByID(ctx context.Context, userID int64) (User, error) {
 	const query = `
-		SELECT id, name, email, birthday, created_at
+		SELECT id, name, email, birthday, created_at, bio, location, website
 		FROM users
 		WHERE id = $1
 	`
@@ -99,10 +99,42 @@ func (r *Repository) FindByID(ctx context.Context, userID int64) (User, error) {
 		&foundUser.Email,
 		&foundUser.Birthday,
 		&foundUser.CreatedAt,
+		&foundUser.Bio,
+		&foundUser.Location,
+		&foundUser.Website,
 	)
 	if err != nil {
 		return User{}, fmt.Errorf("find user by id: %w", err)
 	}
 
 	return foundUser, nil
+}
+
+func (r *Repository) FindByName(ctx context.Context, name string) (User, error) {
+	const query = `SELECT id, name, email, birthday, created_at, bio, location, website FROM users WHERE name = $1`
+	var found User
+	err := r.db.QueryRowContext(ctx, query, name).Scan(
+		&found.ID, &found.Name, &found.Email, &found.Birthday, &found.CreatedAt,
+		&found.Bio, &found.Location, &found.Website,
+	)
+	if err != nil {
+		return User{}, fmt.Errorf("find user by name: %w", err)
+	}
+	return found, nil
+}
+
+func (r *Repository) UpdateProfile(ctx context.Context, userID int64, name, bio, location, website string) (User, error) {
+	const query = `
+		UPDATE users SET name = $2, bio = $3, location = $4, website = $5
+		WHERE id = $1
+		RETURNING id, name, email, birthday, created_at, bio, location, website`
+	var updated User
+	err := r.db.QueryRowContext(ctx, query, userID, name, bio, location, website).Scan(
+		&updated.ID, &updated.Name, &updated.Email, &updated.Birthday, &updated.CreatedAt,
+		&updated.Bio, &updated.Location, &updated.Website,
+	)
+	if err != nil {
+		return User{}, fmt.Errorf("update user profile: %w", err)
+	}
+	return updated, nil
 }
