@@ -3,6 +3,7 @@ package post
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 )
 
@@ -107,4 +108,19 @@ func (r *Repository) FindByID(ctx context.Context, postID int64) (Post, error) {
 	}
 
 	return found, nil
+}
+
+func (r *Repository) Delete(ctx context.Context, postID, userID int64) (*string, error) {
+	const query = `
+		DELETE FROM posts
+		WHERE id = $1 AND user_id = $2
+		RETURNING image_url`
+	var imageURL *string
+	if err := r.db.QueryRowContext(ctx, query, postID, userID).Scan(&imageURL); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, sql.ErrNoRows
+		}
+		return nil, fmt.Errorf("delete post: %w", err)
+	}
+	return imageURL, nil
 }

@@ -145,6 +145,34 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, found)
 }
 
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	postID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || postID <= 0 {
+		writeError(w, http.StatusBadRequest, "INVALID_POST_ID", "投稿IDが不正です")
+		return
+	}
+	userID, ok := auth.UserID(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	imageURL, err := h.repository.Delete(ctx, postID, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "POST_NOT_FOUND", "投稿が見つからないか、削除する権限がありません")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "投稿を削除できませんでした")
+		return
+	}
+	if imageURL != nil {
+		_ = os.Remove(filepath.Join(h.uploadDir, filepath.Base(*imageURL)))
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func parseNonNegativeQuery(r *http.Request, key string, fallback int) (int, error) {
 	value := r.URL.Query().Get(key)
 	if value == "" {

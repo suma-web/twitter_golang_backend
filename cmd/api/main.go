@@ -42,11 +42,16 @@ func main() {
 	router.Use(middleware.Timeout(15 * time.Second))
 
 	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{cfg.FrontendURL},
+		AllowedOrigins: []string{
+			cfg.FrontendURL,
+			"http://localhost:*",
+			"http://127.0.0.1:*",
+		},
 		AllowedMethods: []string{
 			http.MethodGet,
 			http.MethodPost,
 			http.MethodPatch,
+			http.MethodDelete,
 			http.MethodOptions,
 		},
 		AllowedHeaders: []string{
@@ -70,6 +75,7 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{name}", userHandler.Profile)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts", postHandler.List)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts/{id}", postHandler.Get)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/posts/{id}", postHandler.Delete)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts", postHandler.Create)
 	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 
